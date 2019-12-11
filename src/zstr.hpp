@@ -23,7 +23,7 @@ class Exception
     : public std::exception
 {
 public:
-    Exception(z_stream * zstrm_p, int ret)
+    Exception(z_stream* zstrm_p, int ret)
         : _msg("zlib: ")
     {
         switch (ret)
@@ -52,7 +52,7 @@ public:
         _msg += zstrm_p->msg;
     }
     Exception(const std::string msg) : _msg(msg) {}
-    const char * what() const noexcept { return _msg.c_str(); }
+    const char* what() const noexcept { return _msg.c_str(); }
 private:
     std::string _msg;
 }; // class Exception
@@ -104,7 +104,7 @@ class istreambuf
     : public std::streambuf
 {
 public:
-    istreambuf(std::streambuf * _sbuf_p,
+    istreambuf(std::streambuf* _sbuf_p,
                std::size_t _buff_size = default_buff_size, bool _auto_detect = true)
         : sbuf_p(_sbuf_p),
           zstrm_p(nullptr),
@@ -121,10 +121,10 @@ public:
         setg(out_buff, out_buff, out_buff);
     }
 
-    istreambuf(const istreambuf &) = delete;
-    istreambuf(istreambuf &&) = default;
-    istreambuf & operator = (const istreambuf &) = delete;
-    istreambuf & operator = (istreambuf &&) = default;
+    istreambuf(const istreambuf&) = delete;
+    istreambuf(istreambuf&&) = default; // TODO: change to delete?
+    istreambuf& operator = (const istreambuf&) = delete;
+    istreambuf& operator = (istreambuf&&) = default; // TODO: change to delete?
 
     virtual ~istreambuf()
     {
@@ -138,7 +138,7 @@ public:
         if (this->gptr() == this->egptr())
         {
             // pointers for free region in output buffer
-            char * out_buff_free_start = out_buff;
+            char* out_buff_free_start = out_buff;
             do
             {
                 // read more input if none available
@@ -151,15 +151,15 @@ public:
                     if (in_buff_end == in_buff_start) break; // end of input
                 }
                 // auto detect if the stream contains text or deflate data
-                if (auto_detect && ! auto_detect_run)
+                if (auto_detect && !auto_detect_run)
                 {
                     auto_detect_run = true;
-                    unsigned char b0 = *reinterpret_cast< unsigned char * >(in_buff_start);
-                    unsigned char b1 = *reinterpret_cast< unsigned char * >(in_buff_start + 1);
+                    unsigned char b0 = *reinterpret_cast<unsigned char*>(in_buff_start);
+                    unsigned char b1 = *reinterpret_cast<unsigned char*>(in_buff_start + 1);
                     // Ref:
                     // http://en.wikipedia.org/wiki/Gzip
                     // http://stackoverflow.com/questions/9050260/what-does-a-zlib-header-look-like
-                    is_text = ! (in_buff_start + 2 <= in_buff_end
+                    is_text = !(in_buff_start + 2 <= in_buff_end
                                  && ((b0 == 0x1F && b1 == 0x8B)         // gzip header
                                      || (b0 == 0x78 && (b1 == 0x01      // zlib header
                                                         || b1 == 0x9C
@@ -177,18 +177,18 @@ public:
                 else
                 {
                     // run inflate() on input
-                    if (! zstrm_p) zstrm_p = new detail::z_stream_wrapper(true);
-                    zstrm_p->next_in = reinterpret_cast< decltype(zstrm_p->next_in) >(in_buff_start);
-                    zstrm_p->avail_in = in_buff_end - in_buff_start;
-                    zstrm_p->next_out = reinterpret_cast< decltype(zstrm_p->next_out) >(out_buff_free_start);
-                    zstrm_p->avail_out = (out_buff + buff_size) - out_buff_free_start;
+                    if (!zstrm_p) zstrm_p = new detail::z_stream_wrapper(true);
+                    zstrm_p->next_in = reinterpret_cast<decltype(zstrm_p->next_in)>(in_buff_start);
+                    zstrm_p->avail_in = static_cast<uInt>(in_buff_end - in_buff_start);
+                    zstrm_p->next_out = reinterpret_cast<decltype(zstrm_p->next_out)>(out_buff_free_start);
+                    zstrm_p->avail_out = static_cast<uInt>((out_buff + buff_size) - out_buff_free_start);
                     int ret = inflate(zstrm_p, Z_NO_FLUSH);
                     // process return code
                     if (ret != Z_OK && ret != Z_STREAM_END) throw Exception(zstrm_p, ret);
                     // update in&out pointers following inflate()
-                    in_buff_start = reinterpret_cast< decltype(in_buff_start) >(zstrm_p->next_in);
+                    in_buff_start = reinterpret_cast<decltype(in_buff_start)>(zstrm_p->next_in);
                     in_buff_end = in_buff_start + zstrm_p->avail_in;
-                    out_buff_free_start = reinterpret_cast< decltype(out_buff_free_start) >(zstrm_p->next_out);
+                    out_buff_free_start = reinterpret_cast<decltype(out_buff_free_start)>(zstrm_p->next_out);
                     assert(out_buff_free_start + zstrm_p->avail_out == out_buff + buff_size);
                     // if stream ended, deallocate inflator
                     if (ret == Z_STREAM_END)
@@ -208,25 +208,26 @@ public:
             : traits_type::to_int_type(*this->gptr());
     }
 private:
-    std::streambuf * sbuf_p;
-    char * in_buff;
-    char * in_buff_start;
-    char * in_buff_end;
-    char * out_buff;
-    detail::z_stream_wrapper * zstrm_p;
+    std::streambuf* sbuf_p;
+    char* in_buff;
+    char* in_buff_start;
+    char* in_buff_end;
+    char* out_buff;
+    detail::z_stream_wrapper* zstrm_p;
     std::size_t buff_size;
     bool auto_detect;
     bool auto_detect_run;
     bool is_text;
-
-    static const std::size_t default_buff_size = (std::size_t)1 << 20;
+	
+public:
+    static const std::size_t default_buff_size { 1 << 20 };
 }; // class istreambuf
 
 class ostreambuf
     : public std::streambuf
 {
 public:
-    ostreambuf(std::streambuf * _sbuf_p,
+    ostreambuf(std::streambuf* _sbuf_p,
                std::size_t _buff_size = default_buff_size, int _level = Z_DEFAULT_COMPRESSION)
         : sbuf_p(_sbuf_p),
           zstrm_p(new detail::z_stream_wrapper(false, _level)),
@@ -238,21 +239,21 @@ public:
         setp(in_buff, in_buff + buff_size);
     }
 
-    ostreambuf(const ostreambuf &) = delete;
-    ostreambuf(ostreambuf &&) = default;
-    ostreambuf & operator = (const ostreambuf &) = delete;
-    ostreambuf & operator = (ostreambuf &&) = default;
+    ostreambuf(const ostreambuf&) = delete;
+    ostreambuf(ostreambuf&&) = default; // TODO: change to delete?
+    ostreambuf& operator = (const ostreambuf&) = delete;
+    ostreambuf& operator = (ostreambuf&&) = default; // TODO: change to delete?
 
     int deflate_loop(int flush)
     {
         while (true)
         {
-            zstrm_p->next_out = reinterpret_cast< decltype(zstrm_p->next_out) >(out_buff);
-            zstrm_p->avail_out = buff_size;
+            zstrm_p->next_out = reinterpret_cast<decltype(zstrm_p->next_out)>(out_buff);
+            zstrm_p->avail_out = static_cast<uInt>(buff_size);
             int ret = deflate(zstrm_p, flush);
             if (ret != Z_OK && ret != Z_STREAM_END && ret != Z_BUF_ERROR) throw Exception(zstrm_p, ret);
-            std::streamsize sz = sbuf_p->sputn(out_buff, reinterpret_cast< decltype(out_buff) >(zstrm_p->next_out) - out_buff);
-            if (sz != reinterpret_cast< decltype(out_buff) >(zstrm_p->next_out) - out_buff)
+            std::streamsize sz = sbuf_p->sputn(out_buff, reinterpret_cast<decltype(out_buff)>(zstrm_p->next_out) - out_buff);
+            if (sz != reinterpret_cast<decltype(out_buff)>(zstrm_p->next_out) - out_buff)
             {
                 // there was an error in the sink stream
                 return -1;
@@ -282,8 +283,8 @@ public:
     }
     virtual std::streambuf::int_type overflow(std::streambuf::int_type c = traits_type::eof())
     {
-        zstrm_p->next_in = reinterpret_cast< decltype(zstrm_p->next_in) >(pbase());
-        zstrm_p->avail_in = pptr() - pbase();
+        zstrm_p->next_in = reinterpret_cast<decltype(zstrm_p->next_in)>(pbase());
+        zstrm_p->avail_in = static_cast<uInt>(pptr() - pbase());
         while (zstrm_p->avail_in > 0)
         {
             int r = deflate_loop(Z_NO_FLUSH);
@@ -294,13 +295,13 @@ public:
             }
         }
         setp(in_buff, in_buff + buff_size);
-        return traits_type::eq_int_type(c, traits_type::eof()) ? traits_type::eof() : sputc(c);
+        return traits_type::eq_int_type(c, traits_type::eof()) ? traits_type::eof() : sputc(static_cast<char>(c));
     }
     virtual int sync()
     {
         // first, call overflow to clear in_buff
         overflow();
-        if (! pptr()) return -1;
+        if (!pptr()) return -1;
         // then, call deflate asking to finish the zlib stream
         zstrm_p->next_in = nullptr;
         zstrm_p->avail_in = 0;
@@ -309,25 +310,26 @@ public:
         return 0;
     }
 private:
-    std::streambuf * sbuf_p;
-    char * in_buff;
-    char * out_buff;
-    detail::z_stream_wrapper * zstrm_p;
+    std::streambuf* sbuf_p;
+    char* in_buff;
+    char* out_buff;
+    detail::z_stream_wrapper* zstrm_p;
     std::size_t buff_size;
 
-    static const std::size_t default_buff_size = (std::size_t)1 << 20;
+public: 
+    static const std::size_t default_buff_size { 1 << 20 };
 }; // class ostreambuf
 
 class istream
     : public std::istream
 {
 public:
-    istream(std::istream & is)
+    istream(std::istream& is)
         : std::istream(new istreambuf(is.rdbuf()))
     {
         exceptions(std::ios_base::badbit);
     }
-    explicit istream(std::streambuf * sbuf_p)
+    explicit istream(std::streambuf* sbuf_p)
         : std::istream(new istreambuf(sbuf_p))
     {
         exceptions(std::ios_base::badbit);
@@ -342,12 +344,12 @@ class ostream
     : public std::ostream
 {
 public:
-    ostream(std::ostream & os)
-        : std::ostream(new ostreambuf(os.rdbuf()))
+    ostream(std::ostream& os, int level = Z_DEFAULT_COMPRESSION)
+        : std::ostream(new ostreambuf(os.rdbuf(), ostreambuf::default_buff_size, level))
     {
         exceptions(std::ios_base::badbit);
     }
-    explicit ostream(std::streambuf * sbuf_p)
+    explicit ostream(std::streambuf* sbuf_p)
         : std::ostream(new ostreambuf(sbuf_p))
     {
         exceptions(std::ios_base::badbit);
@@ -361,7 +363,7 @@ public:
 namespace detail
 {
 
-template < typename FStream_Type >
+template <typename FStream_Type>
 struct strict_fstream_holder
 {
     strict_fstream_holder(const std::string& filename, std::ios_base::openmode mode = std::ios_base::in)
@@ -373,12 +375,12 @@ struct strict_fstream_holder
 } // namespace detail
 
 class ifstream
-    : private detail::strict_fstream_holder< strict_fstream::ifstream >,
+    : private detail::strict_fstream_holder<strict_fstream::ifstream>,
       public std::istream
 {
 public:
     explicit ifstream(const std::string& filename, std::ios_base::openmode mode = std::ios_base::in)
-        : detail::strict_fstream_holder< strict_fstream::ifstream >(filename, mode),
+        : detail::strict_fstream_holder<strict_fstream::ifstream>(filename, mode | std::ios_base::binary),
           std::istream(new istreambuf(_fs.rdbuf()))
     {
         exceptions(std::ios_base::badbit);
@@ -390,15 +392,20 @@ public:
 }; // class ifstream
 
 class ofstream
-    : private detail::strict_fstream_holder< strict_fstream::ofstream >,
+    : private detail::strict_fstream_holder<strict_fstream::ofstream>,
       public std::ostream
 {
 public:
-    explicit ofstream(const std::string& filename, std::ios_base::openmode mode = std::ios_base::out)
-        : detail::strict_fstream_holder< strict_fstream::ofstream >(filename, mode | std::ios_base::binary),
-          std::ostream(new ostreambuf(_fs.rdbuf()))
+    explicit ofstream(const std::string& filename, std::ios_base::openmode mode = std::ios_base::out, int level = Z_DEFAULT_COMPRESSION)
+        : detail::strict_fstream_holder<strict_fstream::ofstream>(filename, mode | std::ios_base::binary),
+          std::ostream(new ostreambuf(_fs.rdbuf(), ostreambuf::default_buff_size, level))
     {
         exceptions(std::ios_base::badbit);
+    }
+	ofstream& flush() {
+        std::ostream::flush();
+        _fs.flush();
+        return *this;
     }
     virtual ~ofstream()
     {
